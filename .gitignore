@@ -1,0 +1,7 @@
+venv/
+.venv/
+test.txt
+*/__pycache__/
+*.egg-info/
+.mypy_cache
+.python-version
