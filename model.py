@@ -50,7 +50,8 @@ class DroneNetwork(BaseModel):
     ドローンネットワーク全体を管理する司令塔クラス。
     """
     model_config = ConfigDict(validate_assignment=True)
-    nb_drones: int = Field(..., gt=0)
+
+    nb_drones: Optional[int] = Field(default=None, gt=0)
 
     zones: dict[str, Zone] = Field(default_factory=dict)
     connections: list[Connection] = Field(default_factory=list)
@@ -62,6 +63,10 @@ class DroneNetwork(BaseModel):
         """
         パース完了後に、ネットワーク全体に矛盾がないかチェック
         """
+        # 0. nb_dronesが設定されているかチェック
+        if self.nb_drones is None:
+            raise ValueError("nb_drones is missing or undefined.")
+
         # 1. startとendが設定されているかチェック
         if not self.start_zone_name or self.start_zone_name not in self.zones:
             raise ValueError("Start zone is missing or undefined.")
@@ -74,7 +79,7 @@ class DroneNetwork(BaseModel):
             if conn.zone1 not in self.zones or conn.zone2 not in self.zones:
                 raise ValueError(f"Connection links to undefined zones: {conn.zone1}-{conn.zone2}")
 
-            # 3. 重複チェック (A-B と B-A を同じものとして扱うためにソートしてタプルにしますわ)
+            # 3. 重複チェック
             edge = tuple(sorted([conn.zone1, conn.zone2]))
             if edge in seen_connections:
                 raise ValueError(f"Duplicate connection detected: {conn.zone1}-{conn.zone2}")
@@ -108,21 +113,21 @@ class DroneNetwork(BaseModel):
 
     def get_adjacent_zones(self, zone_name: str) -> list[Zone]:
         """
-        指定したゾーンに隣接している（移動可能な）ゾーンのリストを返しますわ。
-        ※経路探索で頻繁に使うことになる重要なメソッドですわね！
+        指定したゾーンに隣接している（移動可能な）ゾーンのリストを返します
+        ※経路探索で頻繁に使うことになる重要なメソッドです
         """
         return []
 
     def initialize_drones(self) -> None:
         """
-        シミュレーション開始前に、指定された数のドローンを start_zone に配置しますわ。
+        シミュレーション開始前に、指定された数のドローンを start_zone に配置します
         """
         pass
 
     def simulate_step(self) -> None:
         """
-        1ターンのシミュレーションを進めますわ。
-        全ドローンの移動計画を立て、競合がないか確認し、移動を実行しますの。
+        1ターンのシミュレーションを進めます
+        全ドローンの移動計画を立て、競合がないか確認し、移動を実行
         """
         pass
 
