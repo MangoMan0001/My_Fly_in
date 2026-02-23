@@ -19,7 +19,7 @@ class DroneNetworkParser:
                     continue
 
                 if line.startswith("nb_drones:"):
-                    if network.nb_drones is not None:
+                    if 0 < network.nb_drones:
                         raise ValueError("nb_drones is defined twice.")
                     if network.zones or network.connections:
                         raise ValueError("nb_drones is not defined in the first line.")
@@ -49,7 +49,7 @@ class DroneNetworkParser:
             except ValueError as e:
                 raise ValueError(f"Parsing error at line {row}: {e}\n  -> {line}")
 
-        network.validate_network_integrity()
+        network.initialize()
 
         return network
 

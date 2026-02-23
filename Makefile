@@ -3,11 +3,12 @@
 # ==========================================
 
 # 実行するPythonコマンド
-PYTHON_EXEC = python3
+PYTHON_EXEC = python3.14
 
 # プロジェクト名とメインスクリプト
 NAME        = fly_in
 MAIN_SCRIPT = fly_in.py
+MAP_FILE = ../pdf/maps/easy/01_linear_path.txt
 
 # 仮想環境の設定
 VENV        = .venv
@@ -46,12 +47,12 @@ install: ## 仮想環境を作成し、依存関係をインストールする
 run: ## メインプログラムを実行
 	@echo "Running $(NAME)..."
 	@if [ ! -d "$(VENV)" ]; then echo "Venv not found. Run 'make install' first."; exit 1; fi
-	@$(PYTHON) $(MAIN_SCRIPT) $(CONFIG_FILE)
+	@$(PYTHON) $(MAIN_SCRIPT) $(MAP_FILE)
 
 debug: ## pdbデバッガを使って実行
 	@echo "Debugging $(NAME)..."
 	@if [ ! -d "$(VENV)" ]; then echo "Venv not found. Run 'make install' first."; exit 1; fi
-	@$(PYTHON) -m pdb $(MAIN_SCRIPT) $(CONFIG_FILE)
+	@$(PYTHON) -m pdb $(MAIN_SCRIPT) $(MAP_FILE)
 
 # ------------------------------------------
 #  Quality Control
@@ -85,7 +86,6 @@ clean: ## 一時ファイルやキャッシュを削除
 fclean: clean ## cleanに加えて仮想環境も削除
 	@echo "Full Cleaning up..."
 	@rm -rf $(VENV)
-	@rm -rf maze.txt
 	@echo "Full Clean complete."
 
 re: clean all

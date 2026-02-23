@@ -18,8 +18,10 @@ def main() -> None:
 
     parser = DroneNetworkParser()
     network = parser.parse(text_data)
-
     print(f"解析成功！ ドローン数: {network.nb_drones}")
+    network.simulate()
+    network.print_history()
+
 
 if __name__ == "__main__":
     main()
