@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any
 from collections import deque
+import heapq
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
 # --- 1. 許可されたゾーンの種類を定義 ---
@@ -21,7 +22,9 @@ class Zone(BaseModel):
     zone_type: ZoneType = Field(default=ZoneType.NORMAL)
     color: Optional[str] = Field(default=None)
     max_drones: int = Field(default=1, gt=0)
-    parking_drones: list[str] = Field(default_factory=list)
+    parking_drones: dict[int, int] = Field(default_factory=dict)        # 時空間滞在データ[ターン数: drone数]
+    connections: dict[str, Connection] = Field(default_factory=dict)    # 接続されたコネクション[ゾーン: コネクション]
+    neignbors: list[Zone] = Field(default_factory=list)                 # 隣人
 
     # 名前に「- (ダッシュ)」 か 「' '(スペース)」が含まれていないかチェック
     @field_validator('name')
@@ -33,25 +36,44 @@ class Zone(BaseModel):
             raise ValueError("Zone name cannot contain space")
         return v
 
-    def can_accept_drone(self) -> bool:
-        """ドローンが停められるかを返す"""
-        if len(self.parking_drones) < self.max_drones:
+    def can_accept_drone(self, turn: int, zone: Zone) -> bool:
+        """指定されたターンにドローンが停められるかを返す"""
+        if self.zone_type == ZoneType.BLOCKED:
+            return False
+        conn = self.connections[zone.name]
+        if self.parking_drones.get(turn, 0) < self.max_drones:
+            return conn.can_connect_drone(turn)
+        return False
+
+    def can_wait_drone(self, turn: int) -> bool:
+        """1ターンドローンを待機できるか返す"""
+        if self.zone_type == ZoneType.BLOCKED:
+            return False
+        if self.parking_drones.get(turn, 0) < self.max_drones:
             return True
         return False
 
-    def add_drone(self, drone_name: str) -> None:
-        """ゾーンにドローンを追加する"""
-        self.parking_drones.append(drone_name)
+    def add_drone(self, turn: int, zone: Zone) -> None:
+        """指定されたターンにドローンを追加する"""
+        conn = self.connections[zone.name]
+        if self.can_accept_drone(turn, zone):
+            conn.connect_drone(turn)
+            self.parking_drones[turn] += 1
+        raise ValueError("The zoen are already at maximum capacity")
 
-    def remove_drone(self, drone_name: str) -> None:
-        """ゾーンからドローンを削除する"""
-        self.parking_drones.remove(drone_name)
+    def get_cost(self) -> int:
+        """このゾーンへ接続するためのコストを返す"""
+        if self.zone_type == ZoneType.RESTRICTED:
+            return 2
+        return 1
 
 # --- 3. Connection (エッジ) モデル ---
 class Connection(BaseModel):
+    name: str
     zone1: str
     zone2: str
     max_link_capacity: int = Field(default=1, gt=0)
+    parking_drones: dict[int, int] = Field(default_factory=dict)        # 時空間滞在データ[ターン数: drone数]
 
     # 自分自身との接続を弾く
     @model_validator(mode='after')
@@ -60,68 +82,83 @@ class Connection(BaseModel):
             raise ValueError(f"A zone cannot connect to itself: {self.zone1}")
         return self
 
+    def can_connect_drone(self, turn: int) -> bool:
+        """指定されたターンにドローンが接続できるかを返す"""
+        if self.parking_drones.get(turn, 0) < self.max_link_capacity:
+            return True
+        return False
+
+    def connect_drone(self, turn: int) -> None:
+        """指定されたターンにドローンを接続する"""
+        if self.can_connect_drone(turn):
+            self.parking_drones[turn] += 1
+        raise ValueError("The connections are already at maximum capacity")
+
 # --- 4. Drone モデル ---
 class Drone(BaseModel):
     """ドローン1機を管理するクラス"""
     id: str                          # "D1", "D2" などのID
     current_location: str            # 現在いるZoneまたはConnectionの名前
     is_delivered: bool = False       # ゴールに到達したかどうか
-    path: list[str] | None = []      # ゴールまでの最短経路
+    path: deque[str] = deque()             # ゴールまでの最短経路
     turn_end: bool = False           # 行動終了フラグ
 
-    def act(self, network: DroneNetwork, is_deadlock: bool =False) -> bool:
+    def act(self) -> str:
         """ドローンが１ターン分行動する。動けないならスキップする"""
-        # 最初とデッドロックしてる時に再検索
-        if not self.path or is_deadlock:
-            self.path = self._find_shortest_path(self.current_location,
-                                                 network.end_zone_name,
-                                                 network.adjacency_list)
-            if self.path is None:
-                raise ValueError(f"ドローン {self.id} がゴールへ到達できませんわ！ルートが孤立しておりますの！")
-            self.path.pop(0)
+        move = self.path.popleft()
+        if move == "Wa-it":
+            return ""
+        return f"{self.id}-{move}"
 
-        # 行けるなら行く
-        if network.zones[self.path[0]].can_accept_drone():
-            network.zones[self.current_location].remove_drone(self.id)
-            network.zones[self.path[0]].add_drone(self.id)
-            self.current_location = self.path[0]
-            self.path.pop(0)
-            if self.current_location == network.end_zone_name:
-                self.is_delivered = True
-            return True
-        return False
+    def find_shortest_path(self,
+                           start_zone: Zone,
+                           target_zone: Zone) -> None:
+        """時空間ダイクストラ法を用いた最短経路探索"""
+        # キューに入れるデータ: (総ターン数, -優先ゾーン通過数, 現在のゾーン, 経路のリスト)
+        queue: list[Any] = []
+        heapq.heappush(queue, (0, 0, start_zone.name, start_zone, [start_zone.name]))
 
-    def _find_shortest_path(self,
-                            start_zone: str,
-                            target_zone: str,
-                            adjacency_list: dict[str, list[str]]) -> Optional[list[str]]:
-        """
-        幅優先探索を用いて、start_zone から target_zone までの最短経路を探す
-        """
-        queue = deque([start_zone])
-
-        came_from: dict[str, str | None]
-        came_from = {start_zone: None}
-
+        # 訪問済みの管理
+        # set(ゾーン名, そのゾーンに着いた時の最小ターン数)
+        visited: set[tuple[str, int]] = set()
         while queue:
-            current = queue.popleft()
-            if current == target_zone:
-                break
-            for next_name in adjacency_list[current]:
-                if next_name not in came_from:
-                    queue.append(next_name)
-                    came_from[next_name] = current
-        if target_zone not in came_from:
-            return None
+            cost, priority, _, current, path = heapq.heappop(queue)
 
-        path = []
-        current_trace: str | None = target_zone
-        while current_trace is not None:
-            path.append(current_trace)
-            current_trace = came_from[current_trace]
+            # 時間軸が同じだったことがないか確認
+            state = (current.name, cost)
+            if state in visited:
+                continue
+            visited.add(state)
 
-        path.reverse()
-        return path
+            # ゴールなら終了
+            if current.name == target_zone.name:
+                self.path = deque(path)
+                # ここで実際の予約を行いたい
+                return
+
+            # 待機できるならキューに追加
+            if current.can_wait_drone(cost + 1):
+                heapq.heappush(queue, (cost + 1, priority, current.name,
+                                       current, path + ["Wa-it"]))
+
+            # 隣接ゾーンへ移動
+            for neignbor in current.neignbors:
+                if neignbor.zone_type == ZoneType.PRIORITY:
+                    priority -= 1
+
+                if neignbor.zone_type == ZoneType.RESTRICTED:
+                    if not neignbor.connections[current.name].can_connect_drone(cost + 1):
+                        continue
+                    if neignbor.can_accept_drone(cost + 2, current):
+                        turn_path = [neignbor.connections[current.name].name] + [neignbor.name]
+                        heapq.heappush(queue,
+                                       (cost + 2, priority, neignbor.name, neignbor,
+                                        path + turn_path))
+                    continue
+
+                if neignbor.can_accept_drone(cost + 1, current):
+                    heapq.heappush(queue, (cost + 1, priority, neignbor.name,
+                                       neignbor, path + [neignbor.name]))
 
 # --- 3. DroneNetwork (統括) モデル ---
 class DroneNetwork(BaseModel):
@@ -131,16 +168,17 @@ class DroneNetwork(BaseModel):
     # -- Model設定 (後から属性の中身が変わってもバリデーションが行われる) --
     model_config = ConfigDict(validate_assignment=True)
     # -- Mapの参照値 --
-    nb_drones: int = Field(default=0, gt=0)                             # ドローン数
-    start_zone_name: str = ""                                           # スタート位置のZone名
-    end_zone_name: str = ""                                             # ゴール位置のZone名
+    nb_drones: int = Field(default=0, gt=0)                                     # ドローン数
+    start_zone_name: str = ""                                                   # スタート位置のZone名
+    end_zone_name: str = ""                                                     # ゴール位置のZone名
     # -- 管理オブジェクト --
-    drones: list[Drone] = Field(default_factory=list)                   # Droneオブジェクトをlistで保存
-    zones: dict[str, Zone] = Field(default_factory=dict)                # Zone名とZoneオブジェクトを辞書で保存
-    connections: list[Connection] = Field(default_factory=list)         # Connerctionオブジェクトをlistで保存
+    drones: list[Drone] = Field(default_factory=list)                           # Droneオブジェクトをlistで保存
+    zones: dict[str, Zone] = Field(default_factory=dict)                        # Zone名とZoneオブジェクトを辞書で保存
+    connections: list[Connection] = Field(default_factory=list)                 # Connerctionオブジェクトをlistで保存
     # -- Other --
-    history: list[list[str]] = Field(default_factory=list)              # 各ターンの出力文字列のリスト
-    adjacency_list: dict[str, list[str]] = Field(default_factory=dict)  # 各ゾーンから接続されているゾーン名
+    history: list[list[str]] = Field(default_factory=list)                      # 各ターンの出力文字列のリスト
+    adjacency_list: dict[str, list[str]] = Field(default_factory=dict)          # 各ゾーンから接続されているゾーン名
+    reservation_table: dict[tuple[int, str], int] = Field(default_factory=dict) # 時空間テーブル
 
     # --- Setter Method ---
     def add_zone(self, zone: Zone) -> None:
@@ -174,6 +212,7 @@ class DroneNetwork(BaseModel):
         """初期化統括メソッド"""
         self._validate_network_integrity()
         self._build_adjacent_zones()
+        self._initialize_zones()
         self._initialize_drones()
 
     def _validate_network_integrity(self) -> None:
@@ -209,52 +248,41 @@ class DroneNetwork(BaseModel):
             self.adjacency_list[conn.zone2].append(conn.zone1)
 
     def _initialize_drones(self) -> None:
-        """スタート地点に全ドローンを配置"""
+        """インスタンス化してスタート地点に全ドローンを配置"""
         for i in range(1, self.nb_drones + 1):
             self.drones.append(Drone(id=f"D{i}",
                                current_location=self.start_zone_name))
-            self.zones[self.start_zone_name].add_drone(self.drones[-1].id)
-        self.zones[self.end_zone_name].max_drones = self.nb_drones
+            self.zones[self.start_zone_name].can_wait_drone(0)
         # debug mesage
         print(f"{self.nb_drones}機のドローンが {self.start_zone_name} に配置されましたわ！")
+
+    def _initialize_zones(self) -> None:
+        """ゾーンの属性の初期化を行う"""
+        self.zones[self.start_zone_name].max_drones = self.nb_drones
+        self.zones[self.end_zone_name].max_drones = self.nb_drones
+        for conn in self.connections:
+            self.zones[conn.zone1].connections[conn.zone2] = conn
+            self.zones[conn.zone1].neignbors.append(self.zones[conn.zone2])
+            self.zones[conn.zone2].connections[conn.zone1] = conn
+            self.zones[conn.zone2].neignbors.append(self.zones[conn.zone1])
 
     # --- シミュレーションメソッド ---
     def simulate(self) -> None:
         """シミュレーションを実行"""
-        while any(not drone.is_delivered for drone in self.drones):
-            runner_drones = [drone for drone in self.drones if not drone.is_delivered]
-            self._simulate_turn(runner_drones)
-            runner_drones = []
-
-    def _simulate_turn(self, unmove_drones: list[Drone]) -> None:
-        """１ターンごとにシミュレーションを進める"""
-        is_deadlock: bool = False
-        turn_moves = []
-        while unmove_drones:
-            is_move: bool = False
-            next_unmove_drones: list[Drone] = []
-            for drone in unmove_drones:
-                if drone.act(self, is_deadlock):
-                    is_move = True
-                    turn_moves.append(f"{drone.id}-{drone.current_location}")
-                else:
-                    next_unmove_drones.append(drone)
-            unmove_drones = next_unmove_drones
-            if not is_move:
-                if is_deadlock:
-                    break
-                is_deadlock = True
-            else:
-                is_deadlock = False
-
-        # 1ターン分の動きを記録
-        self._record_turn(turn_moves)
-
-    def _record_turn(self, turn_moves: list[str]) -> None:
-        """1ターン分の移動記録を履歴に保存"""
-        if turn_moves:
+        for drone in self.drones:
+            drone.find_shortest_path(self.zones[self.start_zone_name],
+                                     self.zones[self.end_zone_name])
+        while True:
+            if all(not drone.path for drone in self.drones):
+                return
+            turn_moves = []
+            for drone in self.drones:
+                move = drone.act()
+                if move:
+                    turn_moves.append(move)
             self.history.append(turn_moves)
 
+    # --- utiles method ---
     def print_history(self) -> None:
         """記録した履歴を出力"""
         print("\n--- Simulation Output ---")
@@ -262,17 +290,9 @@ class DroneNetwork(BaseModel):
             print(" ".join(turn))
         print("-------------------------\n")
 
-    # --- utiles method ---
     def get_adjacent_zones(self, zone_name: str) -> list[Zone]:
         """指定したゾーンに隣接しているゾーンのリストを返します"""
         return [self.zones[name] for name in self.adjacency_list[zone_name]]
-
-    def simulate_step(self) -> None:
-        """
-        1ターンのシミュレーションを進めます
-        全ドローンの移動計画を立て、競合がないか確認し、移動を実行
-        """
-        pass
 
 if __name__ == "__main__":
     pass

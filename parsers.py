@@ -116,14 +116,14 @@ class DroneNetworkParser:
         zone1, zone2 = main_list
 
         # 3.メタデータを辞書にする
-        meta_dict: dict[str, int] = {}
+        meta_dict: dict[str, Any] = {}
         if meta_data:
             meta_list = meta_data.split()
             for meta in meta_list:
                 key, value = meta.split('=', 1)
                 meta_dict[key] = int(value)
 
-        return Connection(zone1=zone1, zone2=zone2, **meta_dict)
+        return Connection(name=main_data, zone1=zone1, zone2=zone2, **meta_dict)
 
 
 if __name__ == "__main__":
