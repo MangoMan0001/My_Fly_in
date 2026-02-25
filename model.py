@@ -56,10 +56,16 @@ class Zone(BaseModel):
     def add_drone(self, turn: int, zone: Zone) -> None:
         """指定されたターンにドローンを追加する"""
         conn = self.connections[zone.name]
-        if self.can_accept_drone(turn, zone):
-            conn.connect_drone(turn)
-            self.parking_drones[turn] += 1
-        raise ValueError("The zoen are already at maximum capacity")
+        if not self.can_accept_drone(turn, zone):
+            raise ValueError("The zoen are already at maximum capacity")
+        conn.connect_drone(turn)
+        self.parking_drones[turn] = self.parking_drones.get(turn, 0) + 1
+
+    def wait_drone(self, turn: int) -> None:
+        """指定したターンでドローンを待機させる"""
+        if not self.can_wait_drone(turn):
+            raise ValueError("The zoen are already at maximum capacity")
+        self.parking_drones[turn] = self.parking_drones.get(turn, 0) + 1
 
     def get_cost(self) -> int:
         """このゾーンへ接続するためのコストを返す"""
@@ -90,9 +96,9 @@ class Connection(BaseModel):
 
     def connect_drone(self, turn: int) -> None:
         """指定されたターンにドローンを接続する"""
-        if self.can_connect_drone(turn):
-            self.parking_drones[turn] += 1
-        raise ValueError("The connections are already at maximum capacity")
+        if not self.can_connect_drone(turn):
+            raise ValueError("The connections are already at maximum capacity")
+        self.parking_drones[turn] = self.parking_drones.get(turn, 0) + 1
 
 # --- 4. Drone モデル ---
 class Drone(BaseModel):
@@ -105,6 +111,8 @@ class Drone(BaseModel):
 
     def act(self) -> str:
         """ドローンが１ターン分行動する。動けないならスキップする"""
+        if not self.path:
+            return ""
         move = self.path.popleft()
         if move == "Wa-it":
             return ""
@@ -112,10 +120,11 @@ class Drone(BaseModel):
 
     def find_shortest_path(self,
                            start_zone: Zone,
-                           target_zone: Zone) -> None:
+                           target_zone: Zone,
+                           zones: dict[str, Zone]) -> None:
         """時空間ダイクストラ法を用いた最短経路探索"""
         # キューに入れるデータ: (総ターン数, -優先ゾーン通過数, 現在のゾーン, 経路のリスト)
-        queue: list[Any] = []
+        queue: list[tuple[int, int, str, 'Zone', list[str]]] = []
         heapq.heappush(queue, (0, 0, start_zone.name, start_zone, [start_zone.name]))
 
         # 訪問済みの管理
@@ -132,8 +141,20 @@ class Drone(BaseModel):
 
             # ゴールなら終了
             if current.name == target_zone.name:
-                self.path = deque(path)
-                # ここで実際の予約を行いたい
+                self.path = deque(path[1:])
+                zone = start_zone
+                for turn, name in enumerate(self.path, 1):
+                    if name == "Wa-it":
+                        zone.wait_drone(turn)
+                    elif '-' in name:
+                        continue
+                    elif zones[name].zone_type == ZoneType.RESTRICTED:
+                        zone.connections[name].connect_drone(turn - 1)
+                        zones[name].add_drone(turn, zone)
+                        zone = zones[name]
+                    else:
+                        zones[name].add_drone(turn, zone)
+                        zone = zones[name]
                 return
 
             # 待機できるならキューに追加
@@ -271,9 +292,12 @@ class DroneNetwork(BaseModel):
         """シミュレーションを実行"""
         for drone in self.drones:
             drone.find_shortest_path(self.zones[self.start_zone_name],
-                                     self.zones[self.end_zone_name])
+                                     self.zones[self.end_zone_name],
+                                     self.zones)
+        count = 0
         while True:
             if all(not drone.path for drone in self.drones):
+                print(f"total_turn:{count}")
                 return
             turn_moves = []
             for drone in self.drones:
@@ -281,6 +305,7 @@ class DroneNetwork(BaseModel):
                 if move:
                     turn_moves.append(move)
             self.history.append(turn_moves)
+            count += 1
 
     # --- utiles method ---
     def print_history(self) -> None:
