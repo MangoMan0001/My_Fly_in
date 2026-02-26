@@ -3,6 +3,7 @@
 import argparse
 from utils_io import read_text_file
 from parsers import DroneNetworkParser
+from visualizer import ConsoleVisualizer
 
 def get_args() -> argparse.Namespace:
     """コマンドライン引数の定義と取得"""
@@ -20,8 +21,7 @@ def main() -> None:
     network = parser.parse(text_data)
     print(f"解析成功！ ドローン数: {network.nb_drones}")
     network.simulate()
-    network.print_history()
-
+    ConsoleVisualizer.render_method(network)
 
 if __name__ == "__main__":
     main()

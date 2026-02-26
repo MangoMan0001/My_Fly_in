@@ -106,8 +106,9 @@ class Drone(BaseModel):
     id: str                          # "D1", "D2" などのID
     current_location: str            # 現在いるZoneまたはConnectionの名前
     is_delivered: bool = False       # ゴールに到達したかどうか
-    path: deque[str] = deque()             # ゴールまでの最短経路
+    path: deque[str] = deque()       # ゴールまでの最短経路
     turn_end: bool = False           # 行動終了フラグ
+    total_cost: int = 0              # ゴールまでにかかったコスト
 
     def act(self) -> str:
         """ドローンが１ターン分行動する。動けないならスキップする"""
@@ -142,6 +143,7 @@ class Drone(BaseModel):
             # ゴールなら終了
             if current.name == target_zone.name:
                 self.path = deque(path[1:])
+                self.total_cost = len(self.path)
                 zone = start_zone
                 for turn, name in enumerate(self.path, 1):
                     if name == "Wa-it":
