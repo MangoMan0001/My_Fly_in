@@ -115,7 +115,9 @@ class GraphicVisualizer:
     @classmethod
     def rend_gui(cls, network: DroneNetwork, file_name: str) -> None:
         """GUIとしてマップをレンダリングする"""
-        # 0. 必要な変数を初期化
+        # ----------------------------------------------------
+        # 4. 形の描き分け
+        # ----------------------------------------------------
         screen_width, screen_height = 1280, 720
         current_turn = 0
 
@@ -125,7 +127,7 @@ class GraphicVisualizer:
             print("\n⚠️ 【警告】マップが広大すぎるため、GUIビジュアライザの描画をスキップしますわ！")
             pygame.quit()
             return # ここで処理を終わらせます
-        r = max(10, min(int(scale * 0.15), 30))
+        r = max(10, min(int(scale * 0.25), 30))
 
         # 2. ヴィジュアライザーの初期化
         pygame.init()
@@ -138,63 +140,10 @@ class GraphicVisualizer:
         running = True
         # 3. pygameによる描画開始
         while running:
-            # --- A. イベント処理（×ボタンで閉じる） ---
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RIGHT and current_turn < max_turn:
-                        current_turn += 1
-                    elif event.key == pygame.K_LEFT and 0 < current_turn:
-                        current_turn -= 1
-                    elif event.key == pygame.K_RETURN:
-                        current_turn = 0
+            current_turn = cls._handle_event(current_turn, max_turn)
 
-            # --- B. 画面の初期化 ---
-            screen.fill(cls.RGB_COLORS['bg'])
-
-            # --- C. 描画処理 ---
-            #　線を描画
-            for conn in network.connections:
-                z1 = network.zones[conn.zone1]
-                z2 = network.zones[conn.zone2]
-                # 描画座標は(zone座標 * 倍率 + zone中心と画面中心とのズレ)で求められる
-                pos1 = (int(z1.x * scale + offset_x), int(z1.y * scale + offset_y))
-                pos2 = (int(z2.x * scale + offset_x), int(z2.y * scale + offset_y))
-                # 線の描画
-                pygame.draw.line(screen, cls.RGB_COLORS['line'], pos1, pos2, 3)
-
-            # ゾーンを描画
-            for zone in network.zones.values():
-                pos = (int(zone.x * scale + offset_x), int(zone.y * scale + offset_y))
-                # 色付け
-                color_name = zone.color if zone.color else 'default'
-                color_code = cls.RGB_COLORS.get(color_name, cls.RGB_COLORS['default'])
-                if zone.zone_type == ZoneType.NORMAL:
-                    pygame.draw.circle(screen, color_code, pos, r)
-                elif zone.zone_type == ZoneType.RESTRICTED:
-
-                    pygame.draw.circle(screen, color_code, pos, r)
-
-            # ドローンを描画
-            current_snap = snapshots[current_turn]
-            for location, ids in current_snap.items():
-                drone_count = len(ids)
-                if '-' in location:
-                    z1_name, z2_name = location.split('-')
-                    z1, z2 = network.zones[z1_name], network.zones[z2_name]
-                    map_x = (z1.x + z2.x) / 2
-                    map_y = (z1.y + z2.y) / 2
-                else:
-                    map_x = network.zones[location].x
-                    map_y = network.zones[location].y
-                pos = (int(map_x * scale + offset_x), int(map_y * scale + offset_y))
-                pygame.draw.circle(screen, cls.RGB_COLORS['drone'], pos, 9)
-                font = pygame.font.SysFont(None, 20)
-                count_text = font.render(str(drone_count), True, cls.RGB_COLORS['black'])
-                text_rect = count_text.get_rect(center=pos)
-                screen.blit(count_text, text_rect)
+            cls._draw_maps()
+            # ターン数を描画
             turn_font = pygame.font.SysFont(None, 36)
             turn_text = turn_font.render(f"Turn: {current_turn} / {max_turn}", True, cls.RGB_COLORS['turn'])
             screen.blit(turn_text, (20, 20))
@@ -275,6 +224,122 @@ class GraphicVisualizer:
             snapshots.append(new_state)
 
         return snapshots
+
+    @classmethod
+    def _handle_event(cls, current_turn: int, max_turn: int) -> int:
+        """バツで閉じるやターン再生などのイベント処理"""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RIGHT and current_turn < max_turn:
+                    current_turn += 1
+                elif event.key == pygame.K_LEFT and 0 < current_turn:
+                    current_turn -= 1
+                elif event.key == pygame.K_RETURN:
+                    current_turn = 0
+        return current_turn
+
+    @classmethod
+    def _draw_maps(cls,
+                   screen: pygame.Surface,
+                   network: 'DroneNetwork',
+                   snapshots: list[dict[str, list[str]]],
+                   current_turn: int,
+                   scale: float,
+                   offset_x: float,
+                   offset_y: float) -> None:
+        """移動経路、ゾーン、ドローンを描画する"""
+        screen.fill(cls.RGB_COLORS['bg'])
+
+        cls._draw_line()
+        cls._draw_zone()
+
+        # ドローンを描画
+        current_snap = snapshots[current_turn]
+        for location, ids in current_snap.items():
+            drone_count = len(ids)
+            if '-' in location:
+                z1_name, z2_name = location.split('-')
+                z1, z2 = network.zones[z1_name], network.zones[z2_name]
+                map_x = (z1.x + z2.x) / 2
+                map_y = (z1.y + z2.y) / 2
+            else:
+                map_x = network.zones[location].x
+                map_y = network.zones[location].y
+            pos = (int(map_x * scale + offset_x), int(map_y * scale + offset_y))
+            pygame.draw.circle(screen, cls.RGB_COLORS['drone'], pos, 9)
+
+            # ドローンの重なりを描画
+            font = pygame.font.SysFont(None, 20)
+            count_text = font.render(str(drone_count), True, cls.RGB_COLORS['black'])
+            text_rect = count_text.get_rect(center=pos)
+            screen.blit(count_text, text_rect)
+
+    @classmethod
+    def _draw_line(cls,
+                   screen: pygame.Surface,
+                   network: DroneNetwork,
+                   scale: float,
+                   offset_x: float,
+                   offset_y: float) -> None:
+        """ゾーン間の移動経路を描画"""
+        for conn in network.connections:
+            z1 = network.zones[conn.zone1]
+            z2 = network.zones[conn.zone2]
+            # 描画座標は(zone座標 * 倍率 + zone中心と画面中心とのズレ)で求められる
+            pos1 = (int(z1.x * scale + offset_x), int(z1.y * scale + offset_y))
+            pos2 = (int(z2.x * scale + offset_x), int(z2.y * scale + offset_y))
+            # 線の描画
+            pygame.draw.line(screen, cls.RGB_COLORS['line'], pos1, pos2, 3)
+
+    @classmethod
+    def _draw_zone(cls,
+                   screen: pygame.Surface,
+                   network: 'DroneNetwork',
+                   scale: float,
+                   offset_x: float,
+                   offset_y: float) -> None:
+        """ゾーンの"""
+        rainbow_palette = [cls.RGB_COLORS["red"], cls.RGB_COLORS["orange"],
+                           cls.RGB_COLORS["yellow"], cls.RGB_COLORS["green"],
+                           cls.RGB_COLORS["cyan"], cls.RGB_COLORS["blue"],
+                           cls.RGB_COLORS["purple"]]
+        for zone in network.zones.values():
+            pos = (int(zone.x * scale + offset_x), int(zone.y * scale + offset_y))
+            # 色付け描画
+            color_name = zone.color if zone.color else 'default'
+            if color_name.lower() == "rainbow":
+                time_ms = pygame.time.get_ticks()
+                color_idx = (time_ms // 200) % len(rainbow_palette)
+                color_code = rainbow_palette[color_idx]
+            else:
+                color_code = cls.RGB_COLORS.get(color_name, cls.RGB_COLORS['default'])
+
+            # ----------------------------------------------------
+            # 4. 形の描き分け
+            # ----------------------------------------------------
+            if zone.zone_type == ZoneType.NORMAL:
+                pygame.draw.circle(screen, color_code, pos, r)
+            elif zone.zone_type == ZoneType.RESTRICTED:
+                rect_area = (pos[0] - r, pos[1] - r, r * 2, r * 2)
+                pygame.draw.rect(screen, color_code, rect_area)
+            elif zone.zone_type == ZoneType.PRIORITY:
+                points = [(pos[0], pos[1] - r), # 上
+                          (pos[0] + r, pos[1]), # 右
+                          (pos[0], pos[1] + r), # 下
+                          (pos[0] - r, pos[1])] # 左
+                pygame.draw.polygon(screen, color_code, points)
+            elif zone.zone_type == ZoneType.BLOCKED:
+                pygame.draw.line(screen, color_code,
+                                 (pos[0] - r, pos[1] - r),
+                                 (pos[0] + r, pos[1] + r), 6)
+                pygame.draw.line(screen, color_code,
+                                 (pos[0] + r, pos[1] - r),
+                                 (pos[0] - r, pos[1] + r), 6)
+
+def cl
 
 if __name__ == "__main__":
     pass
