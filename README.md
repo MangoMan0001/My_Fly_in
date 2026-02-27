@@ -19,10 +19,13 @@ Pythonベースのドローンの同時操作アルゴリズム
 ├── README.md
 ├── setup.cfg
 ├── .gitignore
-│
 ├── requirements.txt                    # 依存ライブラリ（mlx, mypy, flake8等）
+│
+├── fly_in.py		                    # エントリーポイント
+├── model.py							# データモデル
+├── utils_io.py		                    # ファイル読み込み
 ├── parsers.py		                    # マップ読み込み
-└── model.py							# データモデル
+└── visualizer.py		                # ヴィジュアライズ
 ```
 
 ### Instructions
@@ -121,6 +124,12 @@ Fly-inメインアルゴリズムが完成した。 \
 - バリデーションを詰める
 - ヴィジュアライザの導入
 - ２次評価基準の自動計算と出力
+
+2/26 \
+昼夜逆転してるので日付が飛ぶ \
+アルゴリズムは完成しているのでそれを色付き出力にする。 \
+ターミナルヴィジュアライザーモジュール完成 \
+明日はGUIかな
 
 ### visualize
 

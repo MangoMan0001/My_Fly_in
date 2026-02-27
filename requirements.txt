@@ -1,4 +1,4 @@
 pydantic
 flake8
 mypy
-pygame
+pygame-ce
