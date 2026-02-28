@@ -22,7 +22,8 @@ def main() -> None:
     print(f"解析成功！ ドローン数: {network.nb_drones}")
     network.simulate()
     ConsoleVisualizer.render_method(network)
-    GraphicVisualizer.rend_gui(network, args.input_file)
+    visualizer = GraphicVisualizer(1280, 720)
+    visualizer.rend_gui(network, args.input_file)
 
 if __name__ == "__main__":
     main()

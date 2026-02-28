@@ -4,28 +4,61 @@ from model import DroneNetwork, Zone, ZoneType
 import pygame
 import sys
 
+COLORS = {
+    "green": "\033[92m",          # 明るい緑
+    "blue": "\033[94m",           # 明るい青
+    "red": "\033[91m",            # 明るい赤
+    "yellow": "\033[93m",         # 明るい黄色
+    "orange": "\033[38;5;214m",   # 鮮やかなオレンジ
+    "cyan": "\033[96m",           # 明るい水色
+    "purple": "\033[38;5;135m",   # 深みのある紫色
+    "brown": "\033[38;5;130m",    # 落ち着いた茶色
+    "lime": "\033[38;5;118m",     # 蛍光色のようなライムグリーン
+    "magenta": "\033[95m",        # 鮮やかな赤紫（マゼンタ）
+    "gold": "\033[38;5;220m",     # 輝くようなゴールド
+    "black": "\033[30m",          # 黒（※背景が黒いターミナルでは見えなくなります）
+    "maroon": "\033[38;5;52m",    # 暗い赤茶色（マルーン）
+    "darkred": "\033[38;5;88m",   # 深い真紅
+    "violet": "\033[38;5;177m",   # 柔らかい青紫色（スミレ色）
+    "crimson": "\033[38;5;161m",  # 強い赤紫色（クリムゾン）
+    "reset": "\033[0m"            # 【必須】色を元に戻すリセットコード
+}
+
+RGB_COLORS = {
+    "green": (50, 205, 50),       # 鮮やかな緑（ライムグリーン）
+    "blue": (65, 105, 225),       # ロイヤルブルー
+    "red": (220, 20, 60),         # クリムゾンレッド
+    "yellow": (255, 215, 0),      # ゴールド寄りの黄色
+    "orange": (255, 140, 0),      # ダークオレンジ
+    "cyan": (0, 255, 255),        # シアン（水色）
+    "purple": (147, 112, 219),    # ミディアムパープル
+    "brown": (139, 69, 19),       # サドルブラウン（落ち着いた茶色）
+    "lime": (0, 255, 0),          # ピュアなライム（純緑）
+    "magenta": (255, 0, 255),     # マゼンタ（赤紫）
+    "gold": (218, 165, 32),       # ゴールデンロッド（渋い金）
+    "black": (0, 0, 0),           # 真っ黒
+    "maroon": (128, 0, 0),        # マルーン（暗い赤茶色）
+    "darkred": (139, 0, 0),       # ダークレッド
+    "violet": (238, 130, 238),    # バイオレット（スミレ色）
+    "crimson": (220, 20, 60),     # クリムゾン（強い赤紫 ※redと同じにして統一感を出してますわ）
+
+    "default": (200, 200, 200),   # 指定がない時の白灰色
+    "bg": (30, 30, 40),           # 背景のダークグレー
+    "drone": (255, 255, 255),     # ドローン
+    "turn": (255, 255, 255),      # ターン表記
+    "line": (100, 100, 120)       # コネクションの線の色
+}
+
+RAINBOW_PALETTE = [RGB_COLORS["red"],
+                   RGB_COLORS["orange"],
+                   RGB_COLORS["yellow"],
+                   RGB_COLORS["green"],
+                   RGB_COLORS["cyan"],
+                   RGB_COLORS["blue"],
+                   RGB_COLORS["purple"]]
 
 class ConsoleVisualizer:
     """ターミナルに整形して出力"""
-    COLORS = {
-        "green": "\033[92m",          # 明るい緑
-        "blue": "\033[94m",           # 明るい青
-        "red": "\033[91m",            # 明るい赤
-        "yellow": "\033[93m",         # 明るい黄色
-        "orange": "\033[38;5;214m",   # 鮮やかなオレンジ
-        "cyan": "\033[96m",           # 明るい水色
-        "purple": "\033[38;5;135m",   # 深みのある紫色
-        "brown": "\033[38;5;130m",    # 落ち着いた茶色
-        "lime": "\033[38;5;118m",     # 蛍光色のようなライムグリーン
-        "magenta": "\033[95m",        # 鮮やかな赤紫（マゼンタ）
-        "gold": "\033[38;5;220m",     # 輝くようなゴールド
-        "black": "\033[30m",          # 黒（※背景が黒いターミナルでは見えなくなります）
-        "maroon": "\033[38;5;52m",    # 暗い赤茶色（マルーン）
-        "darkred": "\033[38;5;88m",   # 深い真紅
-        "violet": "\033[38;5;177m",   # 柔らかい青紫色（スミレ色）
-        "crimson": "\033[38;5;161m",  # 強い赤紫色（クリムゾン）
-        "reset": "\033[0m"            # 【必須】色を元に戻すリセットコード
-    }
 
     @classmethod
     def render_method(cls, network: DroneNetwork) -> None:
@@ -53,20 +86,20 @@ class ConsoleVisualizer:
         if color_name.lower() == "rainbow":
             return cls._apply_rainbow(move_str)
 
-        color_code = cls.COLORS.get(color_name.lower(), cls.COLORS['reset'])
-        return f"{color_code}{move_str}{cls.COLORS['reset']}"
+        color_code = COLORS.get(color_name.lower(), COLORS['reset'])
+        return f"{color_code}{move_str}{COLORS['reset']}"
 
     @classmethod
     def _apply_rainbow(cls, text: str) -> str:
         """文字列を1文字ずつ虹色に輝かせる"""
         rainbow_palette = [
-            cls.COLORS["red"], cls.COLORS["orange"], cls.COLORS["yellow"],
-            cls.COLORS["green"], cls.COLORS["cyan"], cls.COLORS["blue"], cls.COLORS["purple"]
+            COLORS["red"], COLORS["orange"], COLORS["yellow"],
+            COLORS["green"], COLORS["cyan"], COLORS["blue"], COLORS["purple"]
         ]
         result = ""
         for i, char in enumerate(text):
             result += rainbow_palette[i % len(rainbow_palette)] + char
-        return result + cls.COLORS['reset']
+        return result + COLORS['reset']
 
     @classmethod
     def _print_secondary_metrics(cls, network: 'DroneNetwork') -> None:
@@ -87,76 +120,30 @@ class ConsoleVisualizer:
         print("=========================\n")
 
 class GraphicVisualizer:
-    RGB_COLORS = {
-        "green": (50, 205, 50),       # 鮮やかな緑（ライムグリーン）
-        "blue": (65, 105, 225),       # ロイヤルブルー
-        "red": (220, 20, 60),         # クリムゾンレッド
-        "yellow": (255, 215, 0),      # ゴールド寄りの黄色
-        "orange": (255, 140, 0),      # ダークオレンジ
-        "cyan": (0, 255, 255),        # シアン（水色）
-        "purple": (147, 112, 219),    # ミディアムパープル
-        "brown": (139, 69, 19),       # サドルブラウン（落ち着いた茶色）
-        "lime": (0, 255, 0),          # ピュアなライム（純緑）
-        "magenta": (255, 0, 255),     # マゼンタ（赤紫）
-        "gold": (218, 165, 32),       # ゴールデンロッド（渋い金）
-        "black": (0, 0, 0),           # 真っ黒
-        "maroon": (128, 0, 0),        # マルーン（暗い赤茶色）
-        "darkred": (139, 0, 0),       # ダークレッド
-        "violet": (238, 130, 238),    # バイオレット（スミレ色）
-        "crimson": (220, 20, 60),     # クリムゾン（強い赤紫 ※redと同じにして統一感を出してますわ）
+    """GUIとしてMapの可視化を担うクラス"""
 
-        "default": (200, 200, 200),   # 指定がない時の白灰色
-        "bg": (30, 30, 40),           # 背景のダークグレー
-        "drone": (255, 255, 255),     # ドローン
-        "turn": (255, 255, 255),      # ターン表記
-        "line": (100, 100, 120)       # コネクションの線の色
-    }
+    def __init__(self, width: int, height: int):
+        """初期化"""
+        self.file_name: str = ""
+        self.screen_width: int = width
+        self.screen_height: int = height
+        self.current_turn: int = 0
+        self.max_turn: int = 0
+        self.scale: float = 0
+        self.offset_x: float = 0
+        self.offset_y: float = 0
+        self.r: int = 0
+        self.snapshots: list[dict[str,list[str]]] = []
+        self.screen: pygame.Surface
 
-    @classmethod
-    def rend_gui(cls, network: DroneNetwork, file_name: str) -> None:
+    def rend_gui(self, network: DroneNetwork, file_name: str) -> None:
         """GUIとしてマップをレンダリングする"""
-        # ----------------------------------------------------
-        # 4. 形の描き分け
-        # ----------------------------------------------------
-        screen_width, screen_height = 1280, 720
-        current_turn = 0
+        self.file_name = file_name
+        self._calculate_scale(network)
+        self._run_pygame(network)
 
-        # 1. 座標を中心に調整するための倍率を計算
-        scale, offset_x, offset_y = cls._calculate_scale(network, screen_width, screen_height)
-        if scale < 3.0:
-            print("\n⚠️ 【警告】マップが広大すぎるため、GUIビジュアライザの描画をスキップしますわ！")
-            pygame.quit()
-            return # ここで処理を終わらせます
-        r = max(10, min(int(scale * 0.25), 30))
-
-        # 2. ヴィジュアライザーの初期化
-        pygame.init()
-        screen = pygame.display.set_mode((screen_width, screen_height))
-        pygame.display.set_caption(f"Drone Network Visualizer - {file_name}")
-        clock = pygame.time.Clock()
-        snapshots = cls._generate_snapshots(network)
-        max_turn = len(snapshots) - 1
-
-        running = True
-        # 3. pygameによる描画開始
-        while running:
-            current_turn = cls._handle_event(current_turn, max_turn)
-
-            cls._draw_maps()
-            # ターン数を描画
-            turn_font = pygame.font.SysFont(None, 36)
-            turn_text = turn_font.render(f"Turn: {current_turn} / {max_turn}", True, cls.RGB_COLORS['turn'])
-            screen.blit(turn_text, (20, 20))
-
-            pygame.display.flip()
-            clock.tick(60)
-
-        pygame.quit()
-
-    @classmethod
-    def _calculate_scale(cls, network: 'DroneNetwork',
-                         screen_width: int, screen_height: int) -> tuple[float, float, float]:
-        """マップを画面中央に収めるための (倍率, Xズレ, Yズレ) を計算して返す"""
+    def _calculate_scale(self, network: DroneNetwork) -> None:
+        """座標調整の倍率計算"""
         # 1. マップの最小・最大のX, Yを調べる
         min_x = min(z.x for z in network.zones.values())
         max_x = max(z.x for z in network.zones.values())
@@ -167,8 +154,8 @@ class GraphicVisualizer:
         map_height = max_y - min_y
 
         # 2. 画面の描画に使えるサイズ (1080, 520)
-        drawable_width = screen_width - 200
-        drawable_height = screen_height - 200
+        drawable_width = self.screen_width - 200
+        drawable_height = self.screen_height - 200
 
         # 3. 倍率（スケール）の計算(スケールとは1マス何ピクセルにするかということ)
         scale_x = drawable_width / map_width if map_width > 0 else float('inf')
@@ -179,23 +166,41 @@ class GraphicVisualizer:
             scale = 100.0
 
         # 4. ズレ（オフセット）の計算
-        screen_cx = screen_width / 2
-        screen_cy = screen_height / 2
+        screen_cx = self.screen_width / 2
+        screen_cy = self.screen_height / 2
 
         map_cx = (min_x + max_x) / 2
         map_cy = (min_y + max_y) / 2
 
-        offset_x = screen_cx - (map_cx * scale)
-        offset_y = screen_cy - (map_cy * scale)
+        self.offset_x = screen_cx - (map_cx * scale)
+        self.offset_y = screen_cy - (map_cy * scale)
+        if scale < 3.0:
+            raise ValueError("\nThe MAP size is too large to generate the GUI.")
+        self.r = max(10, min(int(scale * 0.25), 30))
+        self.scale = scale
 
-        return scale, offset_x, offset_y
+    def _run_pygame(self, network:DroneNetwork) -> None:
+        """pygameを動かす"""
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        pygame.display.set_caption(f"Drone Network Visualizer - {self.file_name}")
+        clock = pygame.time.Clock()
+        self._generate_snapshots(network)
 
-    @classmethod
-    def _generate_snapshots(cls, network: 'DroneNetwork') -> list[dict[str, list[str]]]:
+        running = True
+        # --- 描画開始 ---
+        while running:
+            self._handle_event()
+            self._draw_maps(network)
+            self._draw_ui()
+
+            pygame.display.flip()
+            clock.tick(60)
+
+        pygame.quit()
+
+    def _generate_snapshots(self, network: 'DroneNetwork') -> None:
         """ターン数ごとに、ゾーンとそこに存在したドローンを並べたリストを作成する"""
-
-        snapshots = []
-
         current_positions = {drone.id: network.start_zone_name for drone in network.drones}
 
         # 1. 全ドローンをスタート地点に設置
@@ -204,7 +209,7 @@ class GraphicVisualizer:
             if pos not in turn0_state:
                 turn0_state[pos] = []
             turn0_state[pos].append(d_id)
-        snapshots.append(turn0_state)
+        self.snapshots.append(turn0_state)
 
         # 2. 履歴（history）を1ターンずつ読み込んで、時間を進めますわ！
         for turn_moves in network.history:
@@ -220,44 +225,81 @@ class GraphicVisualizer:
                 if pos not in new_state:
                     new_state[pos] = []
                 new_state[pos].append(d_id)
+            self.snapshots.append(new_state)
+            self.max_turn = len(self.snapshots) - 1
 
-            snapshots.append(new_state)
-
-        return snapshots
-
-    @classmethod
-    def _handle_event(cls, current_turn: int, max_turn: int) -> int:
+    def _handle_event(self) -> None:
         """バツで閉じるやターン再生などのイベント処理"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RIGHT and current_turn < max_turn:
-                    current_turn += 1
-                elif event.key == pygame.K_LEFT and 0 < current_turn:
-                    current_turn -= 1
+                if event.key == pygame.K_RIGHT \
+                    and self.current_turn < self.max_turn:
+                    self.current_turn += 1
+                elif event.key == pygame.K_LEFT \
+                    and 0 < self.current_turn:
+                    self.current_turn -= 1
                 elif event.key == pygame.K_RETURN:
-                    current_turn = 0
-        return current_turn
+                    self.current_turn = 0
 
-    @classmethod
-    def _draw_maps(cls,
-                   screen: pygame.Surface,
-                   network: 'DroneNetwork',
-                   snapshots: list[dict[str, list[str]]],
-                   current_turn: int,
-                   scale: float,
-                   offset_x: float,
-                   offset_y: float) -> None:
+    def _draw_maps(self,network: 'DroneNetwork') -> None:
         """移動経路、ゾーン、ドローンを描画する"""
-        screen.fill(cls.RGB_COLORS['bg'])
+        self.screen.fill(RGB_COLORS['bg'])
+        self._draw_line(network)
+        self._draw_zone(network)
+        self._draw_drone(network)
 
-        cls._draw_line()
-        cls._draw_zone()
+    def _draw_line(self,network: DroneNetwork) -> None:
+        """ゾーン間の移動経路を描画"""
+        for conn in network.connections:
+            z1 = network.zones[conn.zone1]
+            z2 = network.zones[conn.zone2]
+            # 描画座標は(zone座標 * 倍率 + zone中心と画面中心とのズレ)で求められる
+            pos1 = (int(z1.x * self.scale + self.offset_x),
+                    int(z1.y * self.scale + self.offset_y))
+            pos2 = (int(z2.x * self.scale + self.offset_x),
+                    int(z2.y * self.scale + self.offset_y))
+            pygame.draw.line(self.screen, RGB_COLORS['line'], pos1, pos2, 3)
 
-        # ドローンを描画
-        current_snap = snapshots[current_turn]
+    def _draw_zone(self,network: 'DroneNetwork') -> None:
+        """ゾーンの描画を行う"""
+        for zone in network.zones.values():
+            r = self.r
+            pos = (int(zone.x * self.scale + self.offset_x),
+                   int(zone.y * self.scale + self.offset_y))
+            # 色付け描画
+            color_name = zone.color if zone.color else 'default'
+            if color_name.lower() == "rainbow":
+                time_ms = pygame.time.get_ticks()
+                color_idx = (time_ms // 200) % len(RAINBOW_PALETTE)
+                color_code = RAINBOW_PALETTE[color_idx]
+            else:
+                color_code = RGB_COLORS.get(color_name, RGB_COLORS['default'])
+            # 形の描き分け
+            if zone.zone_type == ZoneType.NORMAL:
+                pygame.draw.circle(self.screen, color_code, pos, r)
+            elif zone.zone_type == ZoneType.RESTRICTED:
+                rect_area = (pos[0] - r, pos[1] - r, r * 2, r * 2)
+                pygame.draw.rect(self.screen, color_code, rect_area)
+            elif zone.zone_type == ZoneType.PRIORITY:
+                points = [(pos[0], pos[1] - r), # 上
+                          (pos[0] + r, pos[1]), # 右
+                          (pos[0], pos[1] + r), # 下
+                          (pos[0] - r, pos[1])] # 左
+                pygame.draw.polygon(self.screen, color_code, points)
+            elif zone.zone_type == ZoneType.BLOCKED:
+                pygame.draw.line(self.screen, color_code,
+                                 (pos[0] - r, pos[1] - r),
+                                 (pos[0] + r, pos[1] + r), 6)
+                pygame.draw.line(self.screen, color_code,
+                                 (pos[0] + r, pos[1] - r),
+                                 (pos[0] - r, pos[1] + r), 6)
+
+    def _draw_drone(self,network: 'DroneNetwork') -> None:
+        """ドローンを描画"""
+        current_snap = self.snapshots[self.current_turn]
         for location, ids in current_snap.items():
             drone_count = len(ids)
             if '-' in location:
@@ -268,78 +310,21 @@ class GraphicVisualizer:
             else:
                 map_x = network.zones[location].x
                 map_y = network.zones[location].y
-            pos = (int(map_x * scale + offset_x), int(map_y * scale + offset_y))
-            pygame.draw.circle(screen, cls.RGB_COLORS['drone'], pos, 9)
+            pos = (int(map_x * self.scale + self.offset_x),
+                   int(map_y * self.scale + self.offset_y))
+            pygame.draw.circle(self.screen, RGB_COLORS['drone'], pos, 9)
 
-            # ドローンの重なりを描画
             font = pygame.font.SysFont(None, 20)
-            count_text = font.render(str(drone_count), True, cls.RGB_COLORS['black'])
+            count_text = font.render(str(drone_count), True, RGB_COLORS['black'])
             text_rect = count_text.get_rect(center=pos)
-            screen.blit(count_text, text_rect)
+            self.screen.blit(count_text, text_rect)
 
-    @classmethod
-    def _draw_line(cls,
-                   screen: pygame.Surface,
-                   network: DroneNetwork,
-                   scale: float,
-                   offset_x: float,
-                   offset_y: float) -> None:
-        """ゾーン間の移動経路を描画"""
-        for conn in network.connections:
-            z1 = network.zones[conn.zone1]
-            z2 = network.zones[conn.zone2]
-            # 描画座標は(zone座標 * 倍率 + zone中心と画面中心とのズレ)で求められる
-            pos1 = (int(z1.x * scale + offset_x), int(z1.y * scale + offset_y))
-            pos2 = (int(z2.x * scale + offset_x), int(z2.y * scale + offset_y))
-            # 線の描画
-            pygame.draw.line(screen, cls.RGB_COLORS['line'], pos1, pos2, 3)
-
-    @classmethod
-    def _draw_zone(cls,
-                   screen: pygame.Surface,
-                   network: 'DroneNetwork',
-                   scale: float,
-                   offset_x: float,
-                   offset_y: float) -> None:
-        """ゾーンの"""
-        rainbow_palette = [cls.RGB_COLORS["red"], cls.RGB_COLORS["orange"],
-                           cls.RGB_COLORS["yellow"], cls.RGB_COLORS["green"],
-                           cls.RGB_COLORS["cyan"], cls.RGB_COLORS["blue"],
-                           cls.RGB_COLORS["purple"]]
-        for zone in network.zones.values():
-            pos = (int(zone.x * scale + offset_x), int(zone.y * scale + offset_y))
-            # 色付け描画
-            color_name = zone.color if zone.color else 'default'
-            if color_name.lower() == "rainbow":
-                time_ms = pygame.time.get_ticks()
-                color_idx = (time_ms // 200) % len(rainbow_palette)
-                color_code = rainbow_palette[color_idx]
-            else:
-                color_code = cls.RGB_COLORS.get(color_name, cls.RGB_COLORS['default'])
-
-            # ----------------------------------------------------
-            # 4. 形の描き分け
-            # ----------------------------------------------------
-            if zone.zone_type == ZoneType.NORMAL:
-                pygame.draw.circle(screen, color_code, pos, r)
-            elif zone.zone_type == ZoneType.RESTRICTED:
-                rect_area = (pos[0] - r, pos[1] - r, r * 2, r * 2)
-                pygame.draw.rect(screen, color_code, rect_area)
-            elif zone.zone_type == ZoneType.PRIORITY:
-                points = [(pos[0], pos[1] - r), # 上
-                          (pos[0] + r, pos[1]), # 右
-                          (pos[0], pos[1] + r), # 下
-                          (pos[0] - r, pos[1])] # 左
-                pygame.draw.polygon(screen, color_code, points)
-            elif zone.zone_type == ZoneType.BLOCKED:
-                pygame.draw.line(screen, color_code,
-                                 (pos[0] - r, pos[1] - r),
-                                 (pos[0] + r, pos[1] + r), 6)
-                pygame.draw.line(screen, color_code,
-                                 (pos[0] + r, pos[1] - r),
-                                 (pos[0] - r, pos[1] + r), 6)
-
-def cl
+    def _draw_ui(self) -> None:
+        """uiを描画"""
+        turn_font = pygame.font.SysFont(None, 36)
+        turn_text = turn_font.render(f"Turn: {self.current_turn} / {self.max_turn}",
+                                     True, RGB_COLORS['turn'])
+        self.screen.blit(turn_text, (20, 20))
 
 if __name__ == "__main__":
     pass
