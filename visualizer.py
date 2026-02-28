@@ -46,6 +46,11 @@ RGB_COLORS = {
     "bg": (30, 30, 40),           # 背景のダークグレー
     "drone": (255, 255, 255),     # ドローン
     "turn": (255, 255, 255),      # ターン表記
+
+    "cap_bg": (20, 20, 20),        # 限りなく黒に近いステルスブラック
+    "cap_text": (255, 176, 0),     # 鮮烈なハザード・アンバー（琥珀色）
+    "cap_border": (90, 90, 100),   # 無骨なガンメタルグレー
+
     "line": (100, 100, 120)       # コネクションの線の色
 }
 
@@ -135,6 +140,7 @@ class GraphicVisualizer:
         self.r: int = 0
         self.snapshots: list[dict[str,list[str]]] = []
         self.screen: pygame.Surface
+        self.show_capacity: bool = False
 
     def rend_gui(self, network: DroneNetwork, file_name: str) -> None:
         """GUIとしてマップをレンダリングする"""
@@ -243,6 +249,8 @@ class GraphicVisualizer:
                     self.current_turn -= 1
                 elif event.key == pygame.K_RETURN:
                     self.current_turn = 0
+                elif event.key == pygame.K_TAB:
+                    self.show_capacity = not self.show_capacity
 
     def _draw_maps(self,network: 'DroneNetwork') -> None:
         """移動経路、ゾーン、ドローンを描画する"""
@@ -297,8 +305,22 @@ class GraphicVisualizer:
                                  (pos[0] + r, pos[1] - r),
                                  (pos[0] - r, pos[1] + r), 6)
 
+            cap_font = pygame.font.SysFont(None, 24)
+            if self.show_capacity:
+                cap_text_str = str(zone.max_drones)
+
+                pygame.draw.circle(self.screen, RGB_COLORS['cap_bg'], pos, 14)
+                pygame.draw.circle(self.screen, RGB_COLORS['cap_border'], pos, 14, 2) # 太さ2px
+
+                font = pygame.font.SysFont(None, 22) # ドローンより少し大きめ
+                cap_surface = font.render(cap_text_str, True, RGB_COLORS['cap_text'])
+                text_rect = cap_surface.get_rect(center=pos)
+                self.screen.blit(cap_surface, text_rect)
+
     def _draw_drone(self,network: 'DroneNetwork') -> None:
         """ドローンを描画"""
+        if self.show_capacity:
+            return
         current_snap = self.snapshots[self.current_turn]
         for location, ids in current_snap.items():
             drone_count = len(ids)
@@ -325,6 +347,16 @@ class GraphicVisualizer:
         turn_text = turn_font.render(f"Turn: {self.current_turn} / {self.max_turn}",
                                      True, RGB_COLORS['turn'])
         self.screen.blit(turn_text, (20, 20))
+        if self.show_capacity:
+            turn_text = turn_font.render(f"Capacity",
+                                         True, RGB_COLORS['cap_text'])
+            self.screen.blit(turn_text, (200, 20))
+        font_text = turn_font.render("NORMAL - Circle    "
+                                     "RESTRICTED - Square    "
+                                     "PRIORITY - Diamond    "
+                                     "BLOCKED - Cross",
+                                     True, RGB_COLORS['turn'])
+        self.screen.blit(font_text, (20, self.screen_height - 40))
 
 if __name__ == "__main__":
     pass
