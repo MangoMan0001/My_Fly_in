@@ -8,6 +8,7 @@ PYTHON_EXEC = python3.14
 # プロジェクト名とメインスクリプト
 NAME        = fly_in
 MAIN_SCRIPT = fly_in.py
+MAP_FILE = ../pdf/maps/test/00_test.txt
 # MAP_FILE = ../pdf/maps/easy/01_linear_path.txt
 # MAP_FILE = ../pdf/maps/easy/02_simple_fork.txt
 # MAP_FILE = ../pdf/maps/easy/03_basic_capacity.txt
@@ -17,7 +18,7 @@ MAIN_SCRIPT = fly_in.py
 # MAP_FILE = ../pdf/maps/hard/01_maze_nightmare.txt
 # MAP_FILE = ../pdf/maps/hard/02_capacity_hell.txt
 # MAP_FILE = ../pdf/maps/hard/03_ultimate_challenge.txt
-MAP_FILE = ../pdf/maps/challenger/01_the_impossible_dream.txt
+# MAP_FILE = ../pdf/maps/challenger/01_the_impossible_dream.txt
 
 # 仮想環境の設定
 VENV        = .venv

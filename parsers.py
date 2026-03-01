@@ -121,8 +121,10 @@ class DroneNetworkParser:
                     meta_dict["zone_type"] = value
                 elif key == "max_drones":
                     meta_dict[key] = int(value)
-                else:
+                elif key == 'color':
                     meta_dict[key] = value
+                else:
+                    raise ValueError("This metadata is not permitted.")
 
         return Zone(name=name, x=x, y=y, **meta_dict)
 
@@ -161,7 +163,10 @@ class DroneNetworkParser:
             meta_list = meta_data.split()
             for meta in meta_list:
                 key, value = meta.split('=', 1)
-                meta_dict[key] = int(value)
+                if key == 'max_link_capacity':
+                    meta_dict[key] = int(value)
+                else:
+                    raise ValueError("This metadata is not permitted.")
 
         return Connection(
             name=main_data, zone1=zone1, zone2=zone2, **meta_dict

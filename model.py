@@ -426,6 +426,10 @@ class DroneNetwork(BaseModel):
                 )
             seen_connections.add(edge)
 
+        # 4. nb_droneが設定されているかチェック
+        if not self.nb_drones:
+            raise ValueError("The nb_drone is not configured.")
+
     def _build_adjacent_zones(self) -> None:
         """Build an adjacency list linking zones to their neighbors."""
         for name in self.zones:
