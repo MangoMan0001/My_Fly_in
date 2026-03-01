@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
+"""Module for parsing drone network data."""
 
 from model import Zone, Connection, DroneNetwork
 from typing import Any
 
+
 class DroneNetworkParser:
+    """Parser for drone network text data."""
 
     def parse(self, input_text: str) -> DroneNetwork:
-        """
-        入力文字列を解析して、DroneNetworkモデルを構築。
+        """Parse the input string and build a DroneNetwork model.
+
+        Args:
+            input_text (str): The raw text data defining the network.
+
+        Returns:
+            DroneNetwork: The fully initialized drone network.
+
+        Raises:
+            ValueError: If the input format violates the specified constraints.
         """
         lines = input_text.strip().split('\n')
-
         network = DroneNetwork()
 
         for row, line in enumerate(lines, 1):
@@ -22,11 +32,13 @@ class DroneNetworkParser:
                     if 0 < network.nb_drones:
                         raise ValueError("nb_drones is defined twice.")
                     if network.zones or network.connections:
-                        raise ValueError("nb_drones is not defined in the first line.")
+                        raise ValueError(
+                            "nb_drones is not defined in the first line."
+                        )
                     network.nb_drones = self._nb_parse(line)
                     continue
-
-                clean_line = line.split('#', 1)[0].strip() # .行の後ろにあるコメントを削除
+                # .行の後ろにあるコメントを削除
+                clean_line = line.split('#', 1)[0].strip()
 
                 if line.startswith("start_hub:"):
                     network.add_start_zone(self._zone_parse(clean_line))
@@ -44,22 +56,42 @@ class DroneNetworkParser:
                     network.add_connection(self._connection_parse(clean_line))
                     continue
 
-                raise ValueError("This format differs from the specified constraints.")
+                raise ValueError(
+                    "This format differs from the specified constraints."
+                    )
 
             except ValueError as e:
-                raise ValueError(f"Parsing error at line {row}: {e}\n  -> {line}")
+                raise ValueError(
+                    f"Parsing error at line {row}: {e}\n  -> {line}"
+                    )
 
         network.initialize()
 
         return network
 
     def _nb_parse(self, line: str) -> int:
-        """nb_dronesを読み込んでDroneNetworkに渡す"""
+        """Parse the nb_drones line.
+
+        Args:
+            line (str): The line containing the number of drones.
+
+        Returns:
+            int: The parsed number of drones.
+        """
         return int(line.split(':', 1)[1].strip())
 
     def _zone_parse(self, line: str) -> Zone:
-        """zoneを読み込んでDroneNetworkに渡す"""
+        """Parse a zone definition line.
 
+        Args:
+            line (str): The line defining a zone.
+
+        Returns:
+            Zone: A new Zone object with extracted properties and metadata.
+
+        Raises:
+            ValueError: If the zone definition format is invalid.
+        """
         data = line.split(':', 1)[1].strip()
 
         # 1.[]に囲われたメタデータとそれ以外に分ける
@@ -94,10 +126,18 @@ class DroneNetworkParser:
 
         return Zone(name=name, x=x, y=y, **meta_dict)
 
-
     def _connection_parse(self, line: str) -> Connection:
-        """connectionを読み込んでDroneNetworkに渡す"""
+        """Parse a connection definition line.
 
+        Args:
+            line (str): The line defining a connection between two zones.
+
+        Returns:
+            Connection: A new Connection object with extracted properties.
+
+        Raises:
+            ValueError: If the connection definition format is invalid.
+        """
         data = line.split(':', 1)[1].strip()
 
         # 1.[]に囲われたメタデータとそれ以外に分ける
@@ -123,7 +163,9 @@ class DroneNetworkParser:
                 key, value = meta.split('=', 1)
                 meta_dict[key] = int(value)
 
-        return Connection(name=main_data, zone1=zone1, zone2=zone2, **meta_dict)
+        return Connection(
+            name=main_data, zone1=zone1, zone2=zone2, **meta_dict
+            )
 
 
 if __name__ == "__main__":

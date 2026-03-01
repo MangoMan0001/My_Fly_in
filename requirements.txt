@@ -2,3 +2,6 @@ pydantic
 flake8
 mypy
 pygame-ce
+pep8-naming
+flake8-docstrings
+flake8-bugbear

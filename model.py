@@ -1,20 +1,33 @@
 #!/usr/bin/env python3
+"""Module defining the data models and core simulation logic."""
 
 from enum import Enum
-from typing import Optional, Any
+from typing import Optional
 from collections import deque
 import heapq
-from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from pydantic import (
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+    ConfigDict
+)
 
-# --- 1. 許可されたゾーンの種類を定義 ---
+
+# --- 1. Define allowed zone types ---
 class ZoneType(str, Enum):
+    """Enumeration of allowed zone types in the network."""
+
     NORMAL = "normal"
     BLOCKED = "blocked"
     RESTRICTED = "restricted"
     PRIORITY = "priority"
 
-# --- 2. Zone (ノード) モデル ---
+
+# --- 2. Zone (Node) Model ---
 class Zone(BaseModel):
+    """Model representing a single zone (node) in the network."""
+
     name: str
     x: int
     y: int
@@ -22,14 +35,28 @@ class Zone(BaseModel):
     zone_type: ZoneType = Field(default=ZoneType.NORMAL)
     color: Optional[str] = Field(default=None)
     max_drones: int = Field(default=1, gt=0)
-    parking_drones: dict[int, int] = Field(default_factory=dict)        # 時空間滞在データ[ターン数: drone数]
-    connections: dict[str, Connection] = Field(default_factory=dict)    # 接続されたコネクション[ゾーン: コネクション]
-    neignbors: list[Zone] = Field(default_factory=list)                 # 隣人
 
-    # 名前に「- (ダッシュ)」 か 「' '(スペース)」が含まれていないかチェック
+    # Space-time data [turn: drone_count]
+    parking_drones: dict[int, int] = Field(default_factory=dict)
+    # Connected edges [zone_name: Connection]
+    connections: dict[str, Connection] = Field(default_factory=dict)
+    # Neighboring zones
+    neighbors: list[Zone] = Field(default_factory=list)
+
     @field_validator('name')
     @classmethod
     def name_must_not_contain_dash_space(cls, v: str) -> str:
+        """Ensure the zone name does not contain dashes or spaces.
+
+        Args:
+            v (str): The proposed zone name.
+
+        Returns:
+            str: The validated zone name.
+
+        Raises:
+            ValueError: If the name contains a dash or a space.
+        """
         if '-' in v:
             raise ValueError("Zone name cannot contain dashes")
         if ' ' in v:
@@ -37,7 +64,15 @@ class Zone(BaseModel):
         return v
 
     def can_accept_drone(self, turn: int, zone: Zone) -> bool:
-        """指定されたターンにドローンが停められるかを返す"""
+        """Check if the zone can accept a drone at the specified turn.
+
+        Args:
+            turn (int): The simulation turn to check.
+            zone (Zone): The previous zone the drone is coming from.
+
+        Returns:
+            bool: True if the zone can accept the drone, False otherwise.
+        """
         if self.zone_type == ZoneType.BLOCKED:
             return False
         conn = self.connections[zone.name]
@@ -46,7 +81,14 @@ class Zone(BaseModel):
         return False
 
     def can_wait_drone(self, turn: int) -> bool:
-        """1ターンドローンを待機できるか返す"""
+        """Check if a drone can wait in this zone for one turn.
+
+        Args:
+            turn (int): The simulation turn to check.
+
+        Returns:
+            bool: True if waiting is allowed, False otherwise.
+        """
         if self.zone_type == ZoneType.BLOCKED:
             return False
         if self.parking_drones.get(turn, 0) < self.max_drones:
@@ -54,64 +96,115 @@ class Zone(BaseModel):
         return False
 
     def add_drone(self, turn: int, zone: Zone) -> None:
-        """指定されたターンにドローンを追加する"""
+        """Add a drone to this zone at the specified turn.
+
+        Args:
+            turn (int): The simulation turn.
+            zone (Zone): The previous zone the drone is coming from.
+
+        Raises:
+            ValueError: If the zone is already at maximum capacity.
+        """
         conn = self.connections[zone.name]
         if not self.can_accept_drone(turn, zone):
-            raise ValueError("The zoen are already at maximum capacity")
+            raise ValueError("The zone is already at maximum capacity")
         conn.connect_drone(turn)
         self.parking_drones[turn] = self.parking_drones.get(turn, 0) + 1
 
     def wait_drone(self, turn: int) -> None:
-        """指定したターンでドローンを待機させる"""
+        """Make a drone wait in this zone at the specified turn.
+
+        Args:
+            turn (int): The simulation turn.
+
+        Raises:
+            ValueError: If the zone is already at maximum capacity.
+        """
         if not self.can_wait_drone(turn):
-            raise ValueError("The zoen are already at maximum capacity")
+            raise ValueError("The zone is already at maximum capacity")
         self.parking_drones[turn] = self.parking_drones.get(turn, 0) + 1
 
     def get_cost(self) -> int:
-        """このゾーンへ接続するためのコストを返す"""
+        """Get the movement cost required to enter this zone.
+
+        Returns:
+            int: 2 if the zone is restricted, otherwise 1.
+        """
         if self.zone_type == ZoneType.RESTRICTED:
             return 2
         return 1
 
-# --- 3. Connection (エッジ) モデル ---
+
+# --- 3. Connection (Edge) Model ---
 class Connection(BaseModel):
+    """Model representing an edge connecting two zones."""
+
     name: str
     zone1: str
     zone2: str
     max_link_capacity: int = Field(default=1, gt=0)
-    parking_drones: dict[int, int] = Field(default_factory=dict)        # 時空間滞在データ[ターン数: drone数]
+    # Space-time data [turn: drone_count]
+    parking_drones: dict[int, int] = Field(default_factory=dict)
 
     # 自分自身との接続を弾く
     @model_validator(mode='after')
-    def check_zones_are_different(self) -> 'Connection':
+    def check_zones_are_different(self) -> Connection:
+        """Ensure that a connection does not link a zone to itself.
+
+        Returns:
+            Connection: The validated connection instance.
+
+        Raises:
+            ValueError: If zone1 and zone2 are identical.
+        """
         if self.zone1 == self.zone2:
             raise ValueError(f"A zone cannot connect to itself: {self.zone1}")
         return self
 
     def can_connect_drone(self, turn: int) -> bool:
-        """指定されたターンにドローンが接続できるかを返す"""
+        """Check if a drone can use this connection at a given turn.
+
+        Args:
+            turn (int): The simulation turn to check.
+
+        Returns:
+            bool: True if the connection is available, False otherwise.
+        """
         if self.parking_drones.get(turn, 0) < self.max_link_capacity:
             return True
         return False
 
     def connect_drone(self, turn: int) -> None:
-        """指定されたターンにドローンを接続する"""
+        """Register a drone passing through this connection.
+
+        Args:
+            turn (int): The simulation turn.
+
+        Raises:
+            ValueError: If the connection is at maximum capacity.
+        """
         if not self.can_connect_drone(turn):
-            raise ValueError("The connections are already at maximum capacity")
+            raise ValueError("The connection is at maximum capacity")
         self.parking_drones[turn] = self.parking_drones.get(turn, 0) + 1
+
 
 # --- 4. Drone モデル ---
 class Drone(BaseModel):
-    """ドローン1機を管理するクラス"""
-    id: str                          # "D1", "D2" などのID
-    current_location: str            # 現在いるZoneまたはConnectionの名前
-    is_delivered: bool = False       # ゴールに到達したかどうか
-    path: deque[str] = deque()       # ゴールまでの最短経路
-    turn_end: bool = False           # 行動終了フラグ
-    total_cost: int = 0              # ゴールまでにかかったコスト
+    """Class managing a single drone's state and pathfinding."""
+
+    id: str
+    current_location: str
+    is_delivered: bool = False
+    path: deque[str] = Field(default_factory=deque)
+    turn_end: bool = False
+    total_cost: int = 0
 
     def act(self) -> str:
-        """ドローンが１ターン分行動する。動けないならスキップする"""
+        """Execute one turn of movement for the drone.
+
+        Returns:
+            str: The movement formatted string, or empty if waiting/done.
+        """
         if not self.path:
             return ""
         move = self.path.popleft()
@@ -119,18 +212,28 @@ class Drone(BaseModel):
             return ""
         return f"{self.id}-{move}"
 
-    def find_shortest_path(self,
-                           start_zone: Zone,
-                           target_zone: Zone,
-                           zones: dict[str, Zone]) -> None:
-        """時空間ダイクストラ法を用いた最短経路探索"""
+    def find_shortest_path(
+        self,
+        start_zone: Zone,
+        target_zone: Zone,
+        zones: dict[str, Zone]
+    ) -> None:
+        """Find the shortest path using space-time Dijkstra's algorithm.
+
+        Args:
+            start_zone (Zone): The starting location.
+            target_zone (Zone): The destination location.
+            zones (dict[str, Zone]): Dictionary mapping names to Zone objects.
+        """
         # キューに入れるデータ: (総ターン数, -優先ゾーン通過数, 現在のゾーン, 経路のリスト)
-        queue: list[tuple[int, int, str, 'Zone', list[str]]] = []
-        heapq.heappush(queue, (0, 0, start_zone.name, start_zone, [start_zone.name]))
+        queue: list[tuple[int, int, str, Zone, list[str]]] = []
+        heapq.heappush(queue, (0, 0, start_zone.name,
+                               start_zone, [start_zone.name]))
 
         # 訪問済みの管理
         # set(ゾーン名, そのゾーンに着いた時の最小ターン数)
         visited: set[tuple[str, int]] = set()
+
         while queue:
             cost, priority, _, current, path = heapq.heappop(queue)
 
@@ -161,86 +264,141 @@ class Drone(BaseModel):
 
             # 待機できるならキューに追加
             if current.can_wait_drone(cost + 1):
-                heapq.heappush(queue, (cost + 1, priority, current.name,
-                                       current, path + ["Wa-it"]))
-
+                heapq.heappush(
+                    queue,
+                    (cost + 1, priority, current.name,
+                     current, path + ["Wa-it"])
+                )
             # 隣接ゾーンへ移動
-            for neignbor in current.neignbors:
-                if neignbor.zone_type == ZoneType.PRIORITY:
+            for neighbor in current.neighbors:
+                if neighbor.zone_type == ZoneType.PRIORITY:
                     priority -= 1
 
-                if neignbor.zone_type == ZoneType.RESTRICTED:
-                    if not neignbor.connections[current.name].can_connect_drone(cost + 1):
+                if neighbor.zone_type == ZoneType.RESTRICTED:
+                    conn = neighbor.connections[current.name]
+                    if not conn.can_connect_drone(cost + 1):
                         continue
-                    if neignbor.can_accept_drone(cost + 2, current):
-                        turn_path = [neignbor.connections[current.name].name] + [neignbor.name]
-                        heapq.heappush(queue,
-                                       (cost + 2, priority, neignbor.name, neignbor,
-                                        path + turn_path))
+                    if neighbor.can_accept_drone(cost + 2, current):
+                        turn_path = [conn.name] + [neighbor.name]
+                        heapq.heappush(
+                            queue,
+                            (cost + 2, priority, neighbor.name,
+                             neighbor, path + turn_path)
+                        )
                     continue
 
-                if neignbor.can_accept_drone(cost + 1, current):
-                    heapq.heappush(queue, (cost + 1, priority, neignbor.name,
-                                       neignbor, path + [neignbor.name]))
+                if neighbor.can_accept_drone(cost + 1, current):
+                    heapq.heappush(
+                        queue,
+                        (cost + 1, priority, neighbor.name,
+                         neighbor, path + [neighbor.name])
+                    )
 
-# --- 3. DroneNetwork (統括) モデル ---
+
+# --- 5. DroneNetwork Model ---
 class DroneNetwork(BaseModel):
-    """
-    ドローンネットワーク全体を管理する司令塔クラス。
-    """
-    # -- Model設定 (後から属性の中身が変わってもバリデーションが行われる) --
+    """The central class that manages the entire drone network."""
+
     model_config = ConfigDict(validate_assignment=True)
     # -- Mapの参照値 --
-    nb_drones: int = Field(default=0, gt=0)                                     # ドローン数
-    start_zone_name: str = ""                                                   # スタート位置のZone名
-    end_zone_name: str = ""                                                     # ゴール位置のZone名
+    nb_drones: int = Field(default=0, gt=0)
+    start_zone_name: str = ""
+    end_zone_name: str = ""
     # -- 管理オブジェクト --
-    drones: list[Drone] = Field(default_factory=list)                           # Droneオブジェクトをlistで保存
-    zones: dict[str, Zone] = Field(default_factory=dict)                        # Zone名とZoneオブジェクトを辞書で保存
-    connections: list[Connection] = Field(default_factory=list)                 # Connerctionオブジェクトをlistで保存
+    drones: list[Drone] = Field(default_factory=list)
+    zones: dict[str, Zone] = Field(default_factory=dict,
+                                   description="zone_name:zone")
+    connections: list[Connection] = Field(default_factory=list)
     # -- Other --
-    history: list[list[str]] = Field(default_factory=list)                      # 各ターンの出力文字列のリスト
-    adjacency_list: dict[str, list[str]] = Field(default_factory=dict)          # 各ゾーンから接続されているゾーン名
-    reservation_table: dict[tuple[int, str], int] = Field(default_factory=dict) # 時空間テーブル
+    history: list[list[str]] = Field(default_factory=list,
+                                     description="各ターンの出力文字列のリスト")
+    adjacency_list: dict[str, list[str]] = Field(
+        default_factory=dict, description="各ゾーンから接続されているゾーン名"
+        )
 
     # --- Setter Method ---
     def add_zone(self, zone: Zone) -> None:
+        """Add a new zone to the network.
+
+        Args:
+            zone (Zone): The zone object to add.
+
+        Raises:
+            ValueError: If a duplicate name or overlapping coordinates exist.
+        """
         if zone.name in self.zones:
             raise ValueError(f"Duplicate zonename detected: {zone.name}")
         for existing_zone in self.zones.values():
             if existing_zone.x == zone.x and existing_zone.y == zone.y:
-                raise ValueError(f"Coordinate overlap detected: {zone.name} "
-                                 f"and {existing_zone.name} are at ({zone.x}, {zone.y})")
+                raise ValueError(
+                    f"Coordinate overlap detected: {zone.name} "
+                    f"and {existing_zone.name} are at ({zone.x}, {zone.y})"
+                )
         self.zones[zone.name] = zone
 
     def add_start_zone(self, zone: Zone) -> None:
+        """Register the starting zone of the network.
+
+        Args:
+            zone (Zone): The start zone object.
+
+        Raises:
+            ValueError: If a start zone has already been defined.
+        """
         if self.start_zone_name:
-            raise ValueError(f"two or more startzone settings detected: {zone.name}")
+            raise ValueError(
+                f"Two or more start zone settings detected: {zone.name}"
+            )
         self.add_zone(zone)
         self.start_zone_name = zone.name
 
     def add_end_zone(self, zone: Zone) -> None:
+        """Register the ending (target) zone of the network.
+
+        Args:
+            zone (Zone): The end zone object.
+
+        Raises:
+            ValueError: If an end zone has already been defined.
+        """
         if self.end_zone_name:
-            raise ValueError(f"two or more endtzone settings detected: {zone.name}")
+            raise ValueError(
+                f"Two or more end zone settings detected: {zone.name}"
+            )
         self.add_zone(zone)
         self.end_zone_name = zone.name
 
     def add_connection(self, connection: Connection) -> None:
-        if not connection.zone1 in self.zones or not connection.zone2 in self.zones:
-            raise ValueError(f"Connection to an undefined zone detected: {connection.zone1}-{connection.zone2}")
+        """Add a connection between two zones.
+
+        Args:
+            connection (Connection): The connection object.
+
+        Raises:
+            ValueError: If the connection references undefined zones.
+        """
+        if (connection.zone1 not in self.zones or
+                connection.zone2 not in self.zones):
+            raise ValueError(
+                "Connection to an undefined zone detected: "
+                f"{connection.zone1}-{connection.zone2}"
+            )
         self.connections.append(connection)
 
     # --- Initialize and Validation Method ---
     def initialize(self) -> None:
-        """初期化統括メソッド"""
+        """Initialize and validate the network before simulation."""
         self._validate_network_integrity()
         self._build_adjacent_zones()
         self._initialize_zones()
         self._initialize_drones()
 
     def _validate_network_integrity(self) -> None:
-        """パース完了後に、ネットワーク全体に矛盾がないかチェック"""
-        # 0. nb_dronesが設定されているかチェック
+        """Check the overall integrity of the parsed network structure.
+
+        Raises:
+            ValueError: If there are missing hubs or duplicated edges.
+        """
         if self.nb_drones is None:
             raise ValueError("nb_drones is missing or undefined.")
 
@@ -254,16 +412,22 @@ class DroneNetwork(BaseModel):
         for conn in self.connections:
             # 2. Connectionが実在するゾーンを結んでいるかチェック
             if conn.zone1 not in self.zones or conn.zone2 not in self.zones:
-                raise ValueError(f"Connection links to undefined zones: {conn.zone1}-{conn.zone2}")
+                raise ValueError(
+                    "Connection links to undefined zones: "
+                    f"{conn.zone1}-{conn.zone2}"
+                )
 
             # 3. 重複チェック
             edge = tuple(sorted([conn.zone1, conn.zone2]))
             if edge in seen_connections:
-                raise ValueError(f"Duplicate connection detected: {conn.zone1}-{conn.zone2}")
+                raise ValueError(
+                    "Duplicate connection detected: "
+                    f"{conn.zone1}-{conn.zone2}"
+                )
             seen_connections.add(edge)
 
     def _build_adjacent_zones(self) -> None:
-        """各ゾーンに隣接したゾーンをリストで紐づけた辞書を作成する"""
+        """Build an adjacency list linking zones to their neighbors."""
         for name in self.zones:
             self.adjacency_list[name] = []
         for conn in self.connections:
@@ -271,35 +435,39 @@ class DroneNetwork(BaseModel):
             self.adjacency_list[conn.zone2].append(conn.zone1)
 
     def _initialize_drones(self) -> None:
-        """インスタンス化してスタート地点に全ドローンを配置"""
+        """Instantiate all drones and place them in the start zone."""
         for i in range(1, self.nb_drones + 1):
-            self.drones.append(Drone(id=f"D{i}",
-                               current_location=self.start_zone_name))
+            self.drones.append(
+                Drone(id=f"D{i}", current_location=self.start_zone_name)
+            )
             self.zones[self.start_zone_name].can_wait_drone(0)
-        # debug mesage
-        print(f"{self.nb_drones}機のドローンが {self.start_zone_name} に配置されましたわ！")
+
+        print(f"Successfully deployed {self.nb_drones} drones "
+              f"at {self.start_zone_name}!")
 
     def _initialize_zones(self) -> None:
-        """ゾーンの属性の初期化を行う"""
+        """Set up initial capacities and neighbor links for all zones."""
         self.zones[self.start_zone_name].max_drones = self.nb_drones
         self.zones[self.end_zone_name].max_drones = self.nb_drones
         for conn in self.connections:
             self.zones[conn.zone1].connections[conn.zone2] = conn
-            self.zones[conn.zone1].neignbors.append(self.zones[conn.zone2])
+            self.zones[conn.zone1].neighbors.append(self.zones[conn.zone2])
             self.zones[conn.zone2].connections[conn.zone1] = conn
-            self.zones[conn.zone2].neignbors.append(self.zones[conn.zone1])
+            self.zones[conn.zone2].neighbors.append(self.zones[conn.zone1])
 
     # --- シミュレーションメソッド ---
     def simulate(self) -> None:
-        """シミュレーションを実行"""
+        """Run the simulation until all drones reach their destination."""
         for drone in self.drones:
-            drone.find_shortest_path(self.zones[self.start_zone_name],
-                                     self.zones[self.end_zone_name],
-                                     self.zones)
+            drone.find_shortest_path(
+                self.zones[self.start_zone_name],
+                self.zones[self.end_zone_name],
+                self.zones
+            )
         count = 0
         while True:
             if all(not drone.path for drone in self.drones):
-                print(f"total_turn:{count}")
+                print(f"total_turn: {count}")
                 return
             turn_moves = []
             for drone in self.drones:
@@ -311,15 +479,23 @@ class DroneNetwork(BaseModel):
 
     # --- utiles method ---
     def print_history(self) -> None:
-        """記録した履歴を出力"""
+        """Print the recorded simulation history to the terminal."""
         print("\n--- Simulation Output ---")
         for turn in self.history:
             print(" ".join(turn))
         print("-------------------------\n")
 
     def get_adjacent_zones(self, zone_name: str) -> list[Zone]:
-        """指定したゾーンに隣接しているゾーンのリストを返します"""
+        """Get a list of neighboring zones for a specified zone.
+
+        Args:
+            zone_name (str): The name of the target zone.
+
+        Returns:
+            list[Zone]: A list of adjacent Zone objects.
+        """
         return [self.zones[name] for name in self.adjacency_list[zone_name]]
+
 
 if __name__ == "__main__":
     pass

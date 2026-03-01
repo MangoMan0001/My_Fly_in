@@ -1,29 +1,42 @@
 #!/usr/bin/env python3
+"""Main entry point for the drone network simulation."""
 
 import argparse
 from utils_io import read_text_file
 from parsers import DroneNetworkParser
 from visualizer import ConsoleVisualizer, GraphicVisualizer
 
+
 def get_args() -> argparse.Namespace:
-    """コマンドライン引数の定義と取得"""
-    parser = argparse.ArgumentParser(description="ドローンネットワークのシミュレーション")
-    parser.add_argument("input_file", type=str, help="入力ファイルのパス")
+    """Parse command-line arguments.
+
+    Returns:
+        argparse.Namespace: parsed arguments containing the input file path.
+    """
+    parser = argparse.ArgumentParser(description="Drone Network Simulation")
+    parser.add_argument("input_file", type=str, help="Path to the input_file")
     return parser.parse_args()
 
-def main() -> None:
-    """エントリーポイント"""
-    args = get_args()
 
+def main() -> None:
+    """Run the main simulation flow.
+
+    This function reads the map file, parses the network, executes
+    the routing simulation, and launches the visualizers.
+    """
+    args = get_args()
     text_data = read_text_file(args.input_file)
 
     parser = DroneNetworkParser()
     network = parser.parse(text_data)
-    print(f"解析成功！ ドローン数: {network.nb_drones}")
+    print(f"Parsed successfully! Number of drones: {network.nb_drones}")
+
     network.simulate()
+
     ConsoleVisualizer.render_method(network)
     visualizer = GraphicVisualizer(1280, 720)
     visualizer.rend_gui(network, args.input_file)
+
 
 if __name__ == "__main__":
     main()
