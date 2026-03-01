@@ -8,8 +8,7 @@ PYTHON_EXEC = python3.14
 # プロジェクト名とメインスクリプト
 NAME        = fly_in
 MAIN_SCRIPT = fly_in.py
-MAP_FILE = ../pdf/maps/test/00_test.txt
-# MAP_FILE = ../pdf/maps/easy/01_linear_path.txt
+MAP_FILE = ../pdf/maps/easy/01_linear_path.txt
 # MAP_FILE = ../pdf/maps/easy/02_simple_fork.txt
 # MAP_FILE = ../pdf/maps/easy/03_basic_capacity.txt
 # MAP_FILE = ../pdf/maps/medium/01_dead_end_trap.txt
