@@ -193,10 +193,7 @@ class Drone(BaseModel):
     """Class managing a single drone's state and pathfinding."""
 
     id: str
-    current_location: str
-    is_delivered: bool = False
     path: deque[str] = Field(default_factory=deque)
-    turn_end: bool = False
     total_cost: int = 0
 
     def act(self) -> str:
@@ -392,6 +389,7 @@ class DroneNetwork(BaseModel):
         self._build_adjacent_zones()
         self._initialize_zones()
         self._initialize_drones()
+        self._pre_bfs()
 
     def _validate_network_integrity(self) -> None:
         """Check the overall integrity of the parsed network structure.
@@ -441,9 +439,7 @@ class DroneNetwork(BaseModel):
     def _initialize_drones(self) -> None:
         """Instantiate all drones and place them in the start zone."""
         for i in range(1, self.nb_drones + 1):
-            self.drones.append(
-                Drone(id=f"D{i}", current_location=self.start_zone_name)
-            )
+            self.drones.append(Drone(id=f"D{i}"))
             self.zones[self.start_zone_name].can_wait_drone(0)
 
         print(f"Successfully deployed {self.nb_drones} drones "
@@ -459,6 +455,23 @@ class DroneNetwork(BaseModel):
             self.zones[conn.zone2].connections[conn.zone1] = conn
             self.zones[conn.zone2].neighbors.append(self.zones[conn.zone1])
 
+    def _pre_bfs(self) -> None:
+        """Check if there is a route available."""
+        queue = deque([self.zones[self.start_zone_name]])
+        history: set[str] = set()
+        while queue:
+            current = queue.popleft()
+            if current.name in history:
+                continue
+            history.add(current.name)
+            if current.name == self.end_zone_name:
+                return
+            for zone_name in self.adjacency_list[current.name]:
+                if self.zones[zone_name].zone_type == ZoneType.BLOCKED:
+                    continue
+                queue.append(self.zones[zone_name])
+        raise ValueError("Map data cannot reach the end_hub.")
+
     # --- シミュレーションメソッド ---
     def simulate(self) -> None:
         """Run the simulation until all drones reach their destination."""
@@ -471,7 +484,6 @@ class DroneNetwork(BaseModel):
         count = 0
         while True:
             if all(not drone.path for drone in self.drones):
-                print(f"total_turn: {count}")
                 return
             turn_moves = []
             for drone in self.drones:
@@ -488,17 +500,6 @@ class DroneNetwork(BaseModel):
         for turn in self.history:
             print(" ".join(turn))
         print("-------------------------\n")
-
-    def get_adjacent_zones(self, zone_name: str) -> list[Zone]:
-        """Get a list of neighboring zones for a specified zone.
-
-        Args:
-            zone_name (str): The name of the target zone.
-
-        Returns:
-            list[Zone]: A list of adjacent Zone objects.
-        """
-        return [self.zones[name] for name in self.adjacency_list[zone_name]]
 
 
 if __name__ == "__main__":

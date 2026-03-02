@@ -38,6 +38,9 @@ make install
 ```
 Executing this command creates a virtual environment named .venv and installs the packages listed in requirements.txt into it.
 
+
+**Before execution**, download `maps.tar.gz` and place the extracted folder in the root directory.
+
 2. **Execution**
 ```bash
 make run
