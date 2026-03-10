@@ -39,9 +39,9 @@ class Zone(BaseModel):
     # Space-time data [turn: drone_count]
     parking_drones: dict[int, int] = Field(default_factory=dict)
     # Connected edges [zone_name: Connection]
-    connections: dict[str, Connection] = Field(default_factory=dict)
+    connections: dict[str, 'Connection'] = Field(default_factory=dict)
     # Neighboring zones
-    neighbors: list[Zone] = Field(default_factory=list)
+    neighbors: list['Zone'] = Field(default_factory=list)
 
     @field_validator('name')
     @classmethod
@@ -63,7 +63,7 @@ class Zone(BaseModel):
             raise ValueError("Zone name cannot contain space")
         return v
 
-    def can_accept_drone(self, turn: int, zone: Zone) -> bool:
+    def can_accept_drone(self, turn: int, zone: 'Zone') -> bool:
         """Check if the zone can accept a drone at the specified turn.
 
         Args:
@@ -95,7 +95,7 @@ class Zone(BaseModel):
             return True
         return False
 
-    def add_drone(self, turn: int, zone: Zone) -> None:
+    def add_drone(self, turn: int, zone: 'Zone') -> None:
         """Add a drone to this zone at the specified turn.
 
         Args:
@@ -148,7 +148,7 @@ class Connection(BaseModel):
 
     # 自分自身との接続を弾く
     @model_validator(mode='after')
-    def check_zones_are_different(self) -> Connection:
+    def check_zones_are_different(self) -> 'Connection':
         """Ensure that a connection does not link a zone to itself.
 
         Returns:

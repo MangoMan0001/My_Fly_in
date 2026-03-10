@@ -32,6 +32,8 @@ Directory Structure
 
 This program is designed to be executed with **Python 3.10 or higher**
 
+The version at the time of creation is **Python 3.14.3**.
+
 1. **Installation**
 ```bash
 make install
