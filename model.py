@@ -459,6 +459,8 @@ class DroneNetwork(BaseModel):
         """Check if there is a route available."""
         queue = deque([self.zones[self.start_zone_name]])
         history: set[str] = set()
+        if self.zones[self.start_zone_name].zone_type == ZoneType.BLOCKED:
+            raise ValueError("Map data cannot reach the end_hub.")
         while queue:
             current = queue.popleft()
             if current.name in history:
