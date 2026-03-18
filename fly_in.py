@@ -14,7 +14,7 @@ def get_args() -> argparse.Namespace:
         argparse.Namespace: parsed arguments containing the input file path.
     """
     parser = argparse.ArgumentParser(description="Drone Network Simulation")
-    parser.add_argument("input_file", type=str, help="Path to the input_file")
+    parser.add_argument("input_file", type=str, help="Path to the map_file")
     return parser.parse_args()
 
 
@@ -34,7 +34,7 @@ def main() -> None:
     network.simulate()
 
     ConsoleVisualizer.render_method(network)
-    visualizer = GraphicVisualizer(1280, 720)
+    visualizer = GraphicVisualizer(1980, 1080)
     visualizer.rend_gui(network, args.input_file)
 
 

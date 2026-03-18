@@ -436,15 +436,6 @@ class DroneNetwork(BaseModel):
             self.adjacency_list[conn.zone1].append(conn.zone2)
             self.adjacency_list[conn.zone2].append(conn.zone1)
 
-    def _initialize_drones(self) -> None:
-        """Instantiate all drones and place them in the start zone."""
-        for i in range(1, self.nb_drones + 1):
-            self.drones.append(Drone(id=f"D{i}"))
-            self.zones[self.start_zone_name].can_wait_drone(0)
-
-        print(f"Successfully deployed {self.nb_drones} drones "
-              f"at {self.start_zone_name}!")
-
     def _initialize_zones(self) -> None:
         """Set up initial capacities and neighbor links for all zones."""
         self.zones[self.start_zone_name].max_drones = self.nb_drones
@@ -454,6 +445,15 @@ class DroneNetwork(BaseModel):
             self.zones[conn.zone1].neighbors.append(self.zones[conn.zone2])
             self.zones[conn.zone2].connections[conn.zone1] = conn
             self.zones[conn.zone2].neighbors.append(self.zones[conn.zone1])
+
+    def _initialize_drones(self) -> None:
+        """Instantiate all drones and place them in the start zone."""
+        for i in range(1, self.nb_drones + 1):
+            self.drones.append(Drone(id=f"D{i}"))
+            self.zones[self.start_zone_name].can_wait_drone(0)
+
+        print(f"Successfully deployed {self.nb_drones} drones "
+              f"at {self.start_zone_name}!")
 
     def _pre_bfs(self) -> None:
         """Check if there is a route available."""
@@ -483,7 +483,6 @@ class DroneNetwork(BaseModel):
                 self.zones[self.end_zone_name],
                 self.zones
             )
-        count = 0
         while True:
             if all(not drone.path for drone in self.drones):
                 return
@@ -493,7 +492,6 @@ class DroneNetwork(BaseModel):
                 if move:
                     turn_moves.append(move)
             self.history.append(turn_moves)
-            count += 1
 
     # --- utiles method ---
     def print_history(self) -> None:

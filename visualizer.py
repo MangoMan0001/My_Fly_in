@@ -280,7 +280,7 @@ class GraphicVisualizer:
             turn0_state[pos].append(d_id)
         self.snapshots.append(turn0_state)
 
-        # 2. 履歴（history）を1ターンずつ読み込んで、時間を進めますわ！
+        # 2. historyを読み込みながら各ターンでのドローンの所属地点を記録する
         for turn_moves in network.history:
             for move in turn_moves:
                 parts = move.split('-', 1)
@@ -288,12 +288,13 @@ class GraphicVisualizer:
                 target_place = parts[1]
                 current_positions[drone_id] = target_place
 
-            # 3. このターンが終了した時点での写真を撮りますの！
+            # 3. このターンで各ゾーンに所属するドローンIDを記録する
             new_state: dict[str, list[str]] = {}
             for d_id, pos in current_positions.items():
                 if pos not in new_state:
                     new_state[pos] = []
                 new_state[pos].append(d_id)
+            # 4. snapshotsは各ターン毎に各ゾーンに所属するドローンIDのリストを記録する
             self.snapshots.append(new_state)
 
         self.max_turn = len(self.snapshots) - 1
